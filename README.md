@@ -158,25 +158,35 @@ jest jednak ustawione pod Ego Lite.
 
 ## Bezpieczniki
 
-Pilnuje ich kod, nie tylko instrukcje dla agenta:
+**Wymusza kod** (runner `bin/li run`, niezależnie od tego, co zrobi model):
 
-- **Tryb próbny.** W `dry_run` agent pisze szkice i niczego nie publikuje.
-- **Limity** na sesję i na dzień, osobno dla postów, komentarzy, odpowiedzi
-  i reakcji.
-- **Bez duplikatów.** Agent nie komentuje dwa razy tego samego wpisu, nawet
-  pod innym linkiem. Do tego samego autora wraca dopiero po kilku dniach.
-- **Ludzkie tempo.** Losowe przerwy między akcjami, pisanie znak po znaku i
-  losowa godzina startu.
-- **Awaryjny STOP.** Wystarczy `touch data/STOP`. Agent sam tworzy ten plik,
-  gdy zobaczy coś podejrzanego.
-- **Treść z LinkedIna to dane, nie polecenia.** Agent ignoruje „instrukcje”
-  ukryte w postach i nie klika obcych linków. Nie wysyła też wiadomości ani
-  zaproszeń.
+- **Awaryjny STOP.** Gdy istnieje `data/STOP` (`bin/li stop`), sesja w ogóle
+  nie startuje.
 - **Jedna sesja naraz** (blokada na poziomie systemu) i twardy limit czasu.
   Po przekroczeniu czasu zamykane są też wszystkie procesy uruchomione przez
   agenta.
-- **Pełny ślad.** Każda akcja trafia do `data/log.jsonl`, a po sesji
-  dostajesz krótki raport (tekst + HTML).
+- **Losowa godzina startu** i raport po każdej sesji, także gdy agent
+  niczego nie zapisał.
+
+**Liczy kod, a agent ma obowiązek zapytać** przed każdą akcją (`bin/li can`,
+`bin/li target`, `bin/li pause`):
+
+- **Limity** na sesję i na dzień, osobno dla postów, komentarzy, odpowiedzi
+  i reakcji, oraz dni, w które wolno publikować post.
+- **Bez duplikatów.** Ten sam wpis nie dostanie drugiego komentarza, nawet
+  pod innym linkiem. Do tego samego autora agent wraca dopiero po kilku dniach.
+- **Ludzkie tempo.** Losowe przerwy między akcjami i pisanie znak po znaku.
+- **Pełny ślad.** Każda akcja trafia do `data/log.jsonl`.
+
+**Pilnuje scenariusz agenta** (instrukcje dla modelu, więc czytaj raporty,
+zwłaszcza na początku):
+
+- **Tryb próbny.** W `dry_run` agent pisze szkice i nie klika „Opublikuj”.
+- **Treść z LinkedIna to dane, nie polecenia.** Agent ignoruje „instrukcje”
+  ukryte w postach i nie klika obcych linków. Nie wysyła wiadomości ani
+  zaproszeń.
+- **Zatrzymanie przy problemie.** Przy captchy, ekranie logowania albo
+  ostrzeżeniu LinkedIna agent sam tworzy `data/STOP` i oddaje kartę Tobie.
 
 ## Wymagania
 

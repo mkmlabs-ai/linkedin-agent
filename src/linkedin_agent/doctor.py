@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from . import scheduler
-from .settings import ConfigError, Paths, load_config
+from .settings import ConfigError, Paths, find_cli, load_config
 
 
 @dataclass(frozen=True)
@@ -19,12 +17,6 @@ class Check:
     ok: bool
     detail: str
     fix: str = ""
-
-
-def _which(cmd: str) -> str | None:
-    # Installers often put CLIs in ~/.local/bin, which a fresh shell may not have on PATH yet.
-    extra = os.pathsep.join([str(Path.home() / ".local" / "bin"), "/opt/homebrew/bin", "/usr/local/bin"])
-    return shutil.which(cmd) or shutil.which(cmd, path=extra)
 
 
 def _version(cmd: str) -> str:
@@ -37,7 +29,10 @@ def _version(cmd: str) -> str:
 
 def _is_template(paths: Paths, name: str, template: str) -> bool:
     target, source = paths.data / name, paths.templates / template
-    return not target.exists() or (source.exists() and target.read_text() == source.read_text())
+    if not target.exists():
+        return True
+    text = target.read_text(encoding="utf-8").strip()
+    return not text or (source.exists() and text == source.read_text(encoding="utf-8").strip())
 
 
 def run_checks(paths: Paths) -> list[Check]:
@@ -56,7 +51,7 @@ def run_checks(paths: Paths) -> list[Check]:
         ),
     ]
 
-    claude = _which("claude")
+    claude = find_cli("claude")
     checks.append(
         Check(
             "claude",
@@ -66,7 +61,7 @@ def run_checks(paths: Paths) -> list[Check]:
         )
     )
 
-    ego = _which("ego-browser")
+    ego = find_cli("ego-browser")
     app = next(
         (p for p in (Path("/Applications/ego lite.app"), Path.home() / "Applications" / "ego lite.app") if p.exists()),
         None,

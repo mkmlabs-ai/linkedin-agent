@@ -11,7 +11,9 @@ def test_plist_runs_the_cli_with_the_configured_time(paths):
     assert plist["Label"] == "com.linkedin-agent.midday"
     assert plist["ProgramArguments"] == [sys.executable, str(paths.root / "bin" / "li"), "run", "midday"]
     assert plist["StartCalendarInterval"] == {"Hour": 12, "Minute": 35}
-    assert plist["EnvironmentVariables"]["PATH"] == "/opt/bin:/usr/bin"
+    path = plist["EnvironmentVariables"]["PATH"].split(":")
+    assert path[:2] == ["/opt/bin", "/usr/bin"]
+    assert any(p.endswith("/.local/bin") for p in path)
     assert plist["WorkingDirectory"] == str(paths.root)
 
 

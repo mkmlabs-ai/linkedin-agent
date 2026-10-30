@@ -2,7 +2,7 @@
 name: linkedin-session
 description: >-
   Run one LinkedIn activity session on the owner's account in Ego Lite: publish
-  the daily post, comment on AI-industry posts, reply under the owner's posts,
+  the daily post, comment on posts in the owner's niche, reply under the owner's posts,
   react. Use when asked to "run linkedin-session", "sesja LinkedIn", or by the
   scheduled runner with slot=morning|midday|evening.
 ---
@@ -63,7 +63,7 @@ skill does posts, comments, replies and reactions only.
 
 1. `bin/li can post` must print OK.
 2. Pick today's topic: `data/plan.md` if it has an entry for today, otherwise
-   the freshest real AI-industry event from the last 48 hours that matches
+   the freshest real event in the owner's field from the last 48 hours that matches
    `data/topics.md` (use WebSearch; at least two independent sources; note the
    URLs in the draft file, not in the post).
 3. Write it with the `li-post` skill rules (hooks, one idea, no links in the
@@ -83,7 +83,7 @@ skill does posts, comments, replies and reactions only.
 
 1. Collect candidates: the home feed plus a LinkedIn content search for 2-3
    queries from `feed_search_queries` (search → Posts, sorted by latest or
-   relevance). Keep posts that are about AI/automation/LLMs, are younger than
+   relevance). Keep posts that fit the categories in `data/topics.md`, are younger than
    `max_post_age_hours`, have at least `min_post_reactions_to_comment`
    reactions or are from people in the owner's niche, and are not ads,
    job posts, polls, or giveaways ("comment YES to get").

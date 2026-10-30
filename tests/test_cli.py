@@ -70,3 +70,17 @@ def test_doctor_flags_template_voice(paths, capsys, monkeypatch):
     assert checks["voice.md"]["ok"] is False
     assert checks["config"]["ok"] is True
     assert checks["stop_file"]["ok"] is True
+
+
+def test_doctor_rejects_blank_voice(paths, capsys, monkeypatch):
+    from linkedin_agent import scheduler
+
+    monkeypatch.setattr(scheduler, "loaded", lambda cfg: [])
+    main(["init"])
+    (paths.data / "voice.md").write_text("  \n\n")
+    (paths.data / "topics.md").write_text("# Topics\n- AI w logistyce\n")
+    capsys.readouterr()
+    main(["doctor", "--json"])
+    checks = {c["name"]: c for c in json.loads(capsys.readouterr().out)}
+    assert checks["voice.md"]["ok"] is False
+    assert checks["topics.md"]["ok"] is True

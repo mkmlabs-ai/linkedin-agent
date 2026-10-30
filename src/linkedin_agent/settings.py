@@ -11,6 +11,7 @@ import copy
 import json
 import os
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -58,6 +59,20 @@ DEFAULTS: dict[str, Any] = {
 }
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
+
+
+# Installers put CLIs here; a fresh shell or launchd may not have them on PATH.
+EXTRA_BIN_DIRS = (str(Path.home() / ".local" / "bin"), "/opt/homebrew/bin", "/usr/local/bin")
+
+
+def find_cli(cmd: str) -> str | None:
+    """Absolute path of ``cmd`` from PATH or the usual install locations."""
+    return shutil.which(cmd) or shutil.which(cmd, path=os.pathsep.join(EXTRA_BIN_DIRS))
+
+
+def with_extra_bin_dirs(path: str) -> str:
+    parts = [p for p in path.split(os.pathsep) if p]
+    return os.pathsep.join(parts + [d for d in EXTRA_BIN_DIRS if d not in parts])
 
 
 class ConfigError(ValueError):

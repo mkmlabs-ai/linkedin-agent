@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .settings import SLOTS, Config, Paths
+from .settings import SLOTS, Config, Paths, with_extra_bin_dirs
 
 LAUNCH_AGENTS = Path.home() / "Library" / "LaunchAgents"
 
@@ -26,7 +26,7 @@ def build_plist(paths: Paths, cfg: Config, slot: str, env_path: str) -> bytes:
             "WorkingDirectory": str(paths.root),
             # launchd starts jobs with a bare PATH; keep the installer's PATH so
             # `claude`, the browser CLI and the notify command resolve.
-            "EnvironmentVariables": {"PATH": env_path},
+            "EnvironmentVariables": {"PATH": with_extra_bin_dirs(env_path)},
             "StartCalendarInterval": {"Hour": hour, "Minute": minute},
             "StandardOutPath": str(paths.logs / f"launchd-{slot}.out"),
             "StandardErrorPath": str(paths.logs / f"launchd-{slot}.err"),

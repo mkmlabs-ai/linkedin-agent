@@ -44,6 +44,11 @@ class FakeRun:
         return [c[0] for c in self.calls]
 
 
+@pytest.fixture(autouse=True)
+def _no_real_claude(monkeypatch):
+    monkeypatch.setattr("linkedin_agent.runner.find_cli", lambda name: None)
+
+
 def runner(paths, fake, **kw):
     return SessionRunner(
         paths, load_config(paths), run=fake, run_agent=fake.agent, sleep=lambda s: None, clock=lambda: NOW, **kw
@@ -140,7 +145,8 @@ def test_no_notify_command_means_no_extra_process(paths):
     assert set(fake.names()) <= {"pgrep", "open", "claude"}
 
 
-def test_claude_command_shape(paths):
+def test_claude_command_shape(paths, monkeypatch):
+    monkeypatch.setattr("linkedin_agent.runner.find_cli", lambda name: None)
     cmd = claude_command(load_config(paths), "do it")
     assert cmd[:3] == ["claude", "-p", "do it"]
     assert cmd[cmd.index("--agent") + 1] == "linkedin-operator"
@@ -203,3 +209,8 @@ def test_grandchild_ignoring_sigterm_is_killed(tmp_path):
     assert rc == 0
     time.sleep(2)
     assert not marker.exists()
+
+
+def test_claude_resolved_to_absolute_path(paths, monkeypatch):  # overrides the autouse stub
+    monkeypatch.setattr("linkedin_agent.runner.find_cli", lambda name: f"/home/u/.local/bin/{name}")
+    assert claude_command(load_config(paths), "x")[0] == "/home/u/.local/bin/claude"

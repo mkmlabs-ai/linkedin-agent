@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import IO
 
 from .report import fallback_text, parse_notes, render_html
-from .settings import Config, Paths
+from .settings import Config, Paths, find_cli
 from .state import Store, now_iso
 
 TIMEOUT_RC = 124
@@ -55,7 +55,7 @@ def build_prompt(slot: str, report_path: Path, paths: Paths) -> str:
 def claude_command(cfg: Config, prompt: str) -> list[str]:
     r = cfg.runner
     return [
-        r.claude_bin,
+        find_cli(r.claude_bin) or r.claude_bin,
         "-p",
         prompt,
         "--agent",
