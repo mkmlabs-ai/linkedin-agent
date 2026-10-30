@@ -81,6 +81,9 @@ bin/li schedule status
 bin/li schedule off
 ```
 
+The jobs run `bin/li` with the Python that installed them; run
+`bin/li schedule on` again after upgrading or moving Python.
+
 ### Notifications
 
 `notify.command` is an argv list run after each session; `{subject}`,
@@ -102,8 +105,8 @@ bin/li run SLOT [--now] | schedule on|off|status
 ```
 
 `ACTION` is `post`, `comment`, `reply` or `like`; `SLOT` is `morning`,
-`midday` or `evening`. Set `LINKEDIN_AGENT_HOME` to keep `data/` outside the
-checkout.
+`midday` or `evening`. The skills read `data/` relative to the checkout, so
+keep it there (symlink it if it must live elsewhere).
 
 ## Project layout
 

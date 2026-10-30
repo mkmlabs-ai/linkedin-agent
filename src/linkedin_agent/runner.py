@@ -8,9 +8,11 @@ exists -> render HTML -> optional notification command.
 from __future__ import annotations
 
 import fcntl
+import os
 import random
-import shutil
+import signal
 import subprocess
+import sys
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -74,6 +76,30 @@ def notify_command(cfg: Config, subject: str, body_file: Path, html_file: Path) 
     return [arg.format(**values) for arg in cfg.notify_command]
 
 
+def _kill_group(proc: subprocess.Popen, grace: float = 10.0) -> None:
+    for sig, wait in ((signal.SIGTERM, grace), (signal.SIGKILL, None)):
+        try:
+            os.killpg(proc.pid, sig)
+        except ProcessLookupError:
+            return
+        try:
+            proc.wait(timeout=wait)
+            return
+        except subprocess.TimeoutExpired:
+            continue
+
+
+def run_agent(cmd: list[str], *, cwd: Path, stdout: IO[str], timeout: float) -> int:
+    """Run the agent in its own process group and, whatever happens, kill the
+    whole group before returning, so no browser or shell tool it spawned can
+    keep acting after the session lock is released."""
+    proc = subprocess.Popen(cmd, cwd=cwd, stdout=stdout, stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        return proc.wait(timeout=timeout)
+    finally:
+        _kill_group(proc)
+
+
 def _tail(path: Path, lines: int = 25) -> str:
     try:
         return "\n".join(path.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:])
@@ -88,11 +114,12 @@ class SessionRunner:
         cfg: Config,
         *,
         run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+        run_agent: Callable[..., int] = run_agent,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], datetime] = datetime.now,
     ) -> None:
         self.paths, self.cfg = paths, cfg
-        self._run, self._sleep, self._clock = run, sleep, clock
+        self._run, self._run_agent, self._sleep, self._clock = run, run_agent, sleep, clock
 
     def _log(self, fh: IO[str], msg: str) -> None:
         fh.write(f"{self._clock().isoformat(timespec='seconds')} {msg}\n")
@@ -120,7 +147,8 @@ class SessionRunner:
 
     def _ensure_browser(self, log: IO[str]) -> None:
         r = self.cfg.runner
-        if not r.browser_app or not shutil.which("open"):
+        # `open -g -j -a` is macOS-only; elsewhere start the browser yourself.
+        if not r.browser_app or sys.platform != "darwin":
             return
         if r.browser_process:
             running = self._run(["pgrep", "-qf", r.browser_process], check=False).returncode == 0
@@ -140,17 +168,15 @@ class SessionRunner:
         since = now_iso(self._clock())
         begin = time.time()
         try:
-            rc = self._run(
+            rc = self._run_agent(
                 claude_command(self.cfg, build_prompt(slot, report, self.paths)),
                 cwd=self.paths.root,
                 stdout=log,
-                stderr=subprocess.STDOUT,
                 timeout=self.cfg.runner.timeout_minutes * 60,
-                check=False,
-            ).returncode
+            )
         except subprocess.TimeoutExpired:
             rc = TIMEOUT_RC
-            self._log(log, f"timeout after {self.cfg.runner.timeout_minutes:g} min, agent killed")
+            self._log(log, f"timeout after {self.cfg.runner.timeout_minutes:g} min, agent and its tools killed")
         except FileNotFoundError:
             rc = 127
             self._log(log, f"{self.cfg.runner.claude_bin!r} not found on PATH")

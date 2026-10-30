@@ -21,7 +21,7 @@ def test_full_session_flow(paths, capsys, write_config, tmp_path):
     assert main(["target", url, "--author", "Ann"]) == 0
     assert main(["log", "comment", "--url", url, "--author", "Ann", "--text-file", str(draft)]) == 0
     assert main(["can", "comment"]) == 1
-    assert main(["target", url + "?utm=1"]) == 1
+    assert main(["target", url + "?utm_source=share"]) == 1
     capsys.readouterr()
     assert main(["session-end"]) == 0
     out = json.loads(capsys.readouterr().out)

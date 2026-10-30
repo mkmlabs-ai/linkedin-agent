@@ -1,10 +1,19 @@
 import os
 import subprocess
+import sys
+import time
 from datetime import datetime
 
 import pytest
 
-from linkedin_agent.runner import TIMEOUT_RC, SessionRunner, claude_command, exclusive_lock, notify_command
+from linkedin_agent.runner import (
+    TIMEOUT_RC,
+    SessionRunner,
+    claude_command,
+    exclusive_lock,
+    notify_command,
+    run_agent,
+)
 from linkedin_agent.settings import load_config
 from linkedin_agent.state import Store, make_row
 
@@ -16,6 +25,12 @@ class FakeRun:
 
     def __init__(self, paths, claude=None):
         self.paths, self.claude, self.calls = paths, claude, []
+
+    def agent(self, cmd, **kw):
+        self.calls.append(cmd)
+        if self.claude:
+            return self.claude(cmd, **kw).returncode
+        return 0
 
     def __call__(self, cmd, **kw):
         self.calls.append(cmd)
@@ -30,7 +45,9 @@ class FakeRun:
 
 
 def runner(paths, fake, **kw):
-    return SessionRunner(paths, load_config(paths), run=fake, sleep=lambda s: None, clock=lambda: NOW, **kw)
+    return SessionRunner(
+        paths, load_config(paths), run=fake, run_agent=fake.agent, sleep=lambda s: None, clock=lambda: NOW, **kw
+    )
 
 
 def test_stop_file_skips_everything(paths):
@@ -43,7 +60,9 @@ def test_stop_file_skips_everything(paths):
 
 def test_stop_file_created_during_jitter(paths):
     fake = FakeRun(paths)
-    r = SessionRunner(paths, load_config(paths), run=fake, sleep=lambda s: paths.stop.touch(), clock=lambda: NOW)
+    r = SessionRunner(
+        paths, load_config(paths), run=fake, run_agent=fake.agent, sleep=lambda s: paths.stop.touch(), clock=lambda: NOW
+    )
     assert r("midday") == 0
     assert fake.calls == []
 
@@ -133,7 +152,8 @@ def test_notify_disabled(paths):
 
 
 @pytest.mark.parametrize("running, opened", [(True, False), (False, True)])
-def test_browser_started_only_when_not_running(paths, running, opened):
+def test_browser_started_only_when_not_running(paths, running, opened, monkeypatch):
+    monkeypatch.setattr("linkedin_agent.runner.sys.platform", "darwin")
     fake = FakeRun(paths)
     original = fake.__call__
 
@@ -143,6 +163,33 @@ def test_browser_started_only_when_not_running(paths, running, opened):
             return subprocess.CompletedProcess(cmd, 0 if running else 1)
         return original(cmd, **kw)
 
-    r = SessionRunner(paths, load_config(paths), run=call, sleep=lambda s: None, clock=lambda: NOW)
+    r = SessionRunner(
+        paths, load_config(paths), run=call, run_agent=fake.agent, sleep=lambda s: None, clock=lambda: NOW
+    )
     r("morning", now=True)
     assert ("open" in fake.names()) is opened
+
+
+def test_browser_never_started_off_macos(paths, monkeypatch):
+    monkeypatch.setattr("linkedin_agent.runner.sys.platform", "linux")
+    fake = FakeRun(paths)
+    runner(paths, fake)("morning", now=True)
+    assert fake.names() == ["claude"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
+def test_timeout_kills_grandchildren(tmp_path):
+    marker = tmp_path / "still-running"
+    script = f"(sleep 2; touch {marker}) & sleep 30"
+    with (tmp_path / "log").open("w") as log, pytest.raises(subprocess.TimeoutExpired):
+        run_agent(["/bin/sh", "-c", script], cwd=tmp_path, stdout=log, timeout=0.5)
+    time.sleep(2.5)
+    assert not marker.exists()
+
+
+def test_tools_left_behind_after_normal_exit_are_killed(tmp_path):
+    marker = tmp_path / "orphan"
+    with (tmp_path / "log").open("w") as log:
+        assert run_agent(["/bin/sh", "-c", f"(sleep 1; touch {marker}) &"], cwd=tmp_path, stdout=log, timeout=5) == 0
+    time.sleep(1.5)
+    assert not marker.exists()

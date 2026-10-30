@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .settings import ACTIONS, Config, Paths
 
@@ -24,19 +24,30 @@ def now_iso(now: datetime | None = None) -> str:
     return (now or datetime.now()).isoformat(timespec="seconds")
 
 
-def normalize_url(url: str) -> str:
-    """Drop tracking query strings and trailing slashes; keep the fragment.
+TRACKING_PARAMS = frozenset({"trk", "trackingid", "refid", "lipi", "rcm", "originalsubdomain", "original_referer"})
 
-    LinkedIn appends ``?utm_source=...`` and similar to shared URLs, so the
-    same post can show up under many spellings. The fragment is kept because
-    replies are keyed as ``<post-url>#<commenter>``.
+
+def _is_tracking(key: str) -> bool:
+    key = key.lower()
+    return key.startswith("utm_") or key in TRACKING_PARAMS
+
+
+def normalize_url(url: str) -> str:
+    """Canonical key for a post or comment URL.
+
+    LinkedIn adds ``utm_*``, ``trk`` and similar to shared URLs, so the same
+    post shows up under many spellings. Those are dropped; meaningful
+    parameters such as ``commentUrn`` stay (sorted), so two comments under one
+    post remain different targets. The fragment is kept because replies may
+    be keyed as ``<post-url>#<commenter>``.
     """
     url = url.strip()
     parts = urlsplit(url)
     if not parts.scheme or not parts.netloc:
         return url
     path = parts.path.rstrip("/") or "/"
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, "", parts.fragment))
+    query = urlencode(sorted((k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if not _is_tracking(k)))
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, query, parts.fragment))
 
 
 def normalize_author(name: str | None) -> str:
@@ -85,14 +96,14 @@ class Store:
         return session
 
 
-def counts(rows: list[dict[str, Any]], day: str, since: str | None = None) -> dict[str, int]:
-    """Live actions per type on ``day`` (YYYY-MM-DD), optionally from ``since`` on."""
+def counts(rows: list[dict[str, Any]], day: str | None = None, since: str | None = None) -> dict[str, int]:
+    """Live actions per type, filtered to ``day`` (YYYY-MM-DD) and/or from ``since`` on."""
     out = dict.fromkeys(ACTIONS, 0)
     for r in rows:
         if r.get("dry") or r["action"] not in out:
             continue
         ts = str(r["ts"])
-        if ts[:10] == day and (since is None or ts >= since):
+        if (day is None or ts[:10] == day) and (since is None or ts >= since):
             out[r["action"]] += 1
     return out
 
@@ -110,7 +121,10 @@ class Usage:
 def usage(cfg: Config, rows: list[dict[str, Any]], session: dict[str, Any], now: datetime | None = None) -> Usage:
     day = (now or datetime.now()).date().isoformat()
     today = counts(rows, day)
-    ses = counts(rows, day, session.get("started"))
+    # A session that crosses midnight keeps its count; without a session
+    # window, fall back to today's actions.
+    started = session.get("started")
+    ses = counts(rows, since=started) if started else today
     remaining = {a: max(0, min(cfg.limits_per_session[a] - ses[a], cfg.limits_per_day[a] - today[a])) for a in ACTIONS}
     return Usage(today, ses, remaining)
 

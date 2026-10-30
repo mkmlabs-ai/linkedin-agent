@@ -1,7 +1,7 @@
 """Project paths and validated configuration.
 
-The project root is the repository checkout unless ``LINKEDIN_AGENT_HOME``
-points elsewhere. All private, per-account files live in ``<root>/data`` and
+The project root is the repository checkout (``LINKEDIN_AGENT_HOME`` overrides
+it with another full checkout, used by the tests). All private, per-account files live in ``<root>/data`` and
 are never committed; ``<root>/templates`` holds the public examples.
 """
 

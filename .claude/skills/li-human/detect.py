@@ -31,6 +31,7 @@ import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEX = os.path.join(HERE, "slop.json")
+TOO_SHORT = "too short to judge"
 
 SENT_RE = re.compile(r"[^.!?\n]+[.!?]*")
 # Unicode letters, so Polish, German etc. are counted as words too.
@@ -69,7 +70,7 @@ def check_burstiness(text):
     """Humans vary sentence length hard. Models write even."""
     lens = [len(s.split()) for s in sentences(text)]
     if len(lens) < 4:
-        return 50.0, "too short to judge"
+        return 50.0, TOO_SHORT
     mean = statistics.mean(lens)
     cv = statistics.pstdev(lens) / mean if mean else 0
     score = scale(cv, human=0.70, machine=0.22)
@@ -80,7 +81,7 @@ def check_specificity(text):
     """Numbers, names and concrete nouns. Slop is abstract."""
     w = words(text)
     if len(w) < 25:
-        return 50.0, "too short to judge"
+        return 50.0, TOO_SHORT
     per100 = 100 / len(w)
     hits = len(NUMBERS.findall(text)) + len(proper_nouns(text))
     density = hits * per100
@@ -128,7 +129,7 @@ def check_voice(text, lex):
     """Contractions, person, and the shapes models default to."""
     w = words(text)
     if len(w) < 25:
-        return 50.0, "too short to judge"
+        return 50.0, TOO_SHORT
     per100 = 100 / len(w)
     contractions = len(CONTRACTIONS.findall(text)) * per100
     person = len(PRONOUNS.findall(text)) * per100
@@ -167,7 +168,10 @@ def run(text, lex):
     results["SLOP DENSITY"] = check_slop(text, lex)
     results["FINGERPRINT"] = check_fingerprint(text)
     results["VOICE"] = check_voice(text, lex)
-    scores = [results[c][0] for c in CHECKS]
+    # Comments and replies are often too short for some checks; those report
+    # "too short to judge" and must not block a PASS on their own.
+    judged = [c for c in CHECKS if results[c][1] != TOO_SHORT] or CHECKS
+    scores = [results[c][0] for c in judged]
     # The weakest check drags the verdict: a detector only needs one signal.
     overall = statistics.mean(scores) * 0.6 + min(scores) * 0.4
     verdict = "PASS" if overall >= 70 and min(scores) >= 55 else (
