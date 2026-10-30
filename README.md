@@ -1,96 +1,159 @@
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="linkedin-agent: Twój LinkedIn aktywny 3 razy dziennie. Posty, komentarze i odpowiedzi pisane Twoim głosem, w Twojej przeglądarce." width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/mkmlabs-ai/linkedin-agent/actions/workflows/ci.yml"><img src="https://github.com/mkmlabs-ai/linkedin-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-3776ab" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/Claude%20Code-agent-d97757" alt="Claude Code">
+  <img src="https://img.shields.io/badge/przegl%C4%85darka-Ego%20Lite-7c5cff" alt="Ego Lite">
+  <img src="https://img.shields.io/badge/licencja-MIT-22c55e" alt="MIT">
+</p>
+
 # linkedin-agent
 
-A scheduled agent that keeps your own LinkedIn account active: it publishes
-the planned post of the day, comments on relevant posts in your niche,
-answers comments under your posts and leaves reactions. It runs three times a
-day as a headless [Claude Code](https://claude.com/claude-code) session that
-drives a local, logged-in browser (Ego Lite) the way a
-person would.
+Agent, który prowadzi Twój własny profil na LinkedInie. Trzy razy dziennie
+publikuje zaplanowany post, komentuje ciekawe wpisy z Twojej branży,
+odpowiada na komentarze pod Twoimi postami i zostawia reakcje. Robi to jak
+człowiek: w Twojej zalogowanej przeglądarce, z przerwami, w Twoim stylu
+pisania.
 
-No LinkedIn API, no MCP server, no third-party automation service, no cookies
-leave your machine. Everything the agent knows about you lives in a private
-`data/` folder that is never committed.
+Pod spodem pracuje [Claude Code](https://claude.com/claude-code) uruchamiany
+bez okna oraz przeglądarka [Ego Lite](https://lite.ego.app/).
 
-> **Read this first.** LinkedIn's User Agreement restricts automated activity.
-> Running this agent on your account is your decision and your risk. Start in
-> `dry_run`, keep the limits low, and read every draft before you switch to
-> `live`.
+- **Bez API LinkedIna, bez serwerów MCP, bez zewnętrznych usług.** Nic nie
+  publikuje się przez cudze serwery.
+- **Twoje dane zostają u Ciebie.** Głos, tematy, plan, logi i szkice leżą w
+  folderze `data/`, który nigdy nie trafia do repozytorium.
+- **Żadnych loginów ani haseł w kodzie.** Agent korzysta z sesji, w której
+  sam się zalogowałeś w Ego Lite. Ciasteczka nie opuszczają Twojego komputera.
 
-## How it works
+> [!WARNING]
+> Regulamin LinkedIna ogranicza automatyzację konta. Uruchamiasz agenta na
+> własną odpowiedzialność. Zacznij od trybu `dry_run`, trzymaj niskie limity
+> i przeczytaj kilka szkiców, zanim przełączysz się na `live`.
 
-```
-launchd (3x a day, random jitter)
-  └─ bin/li run <slot>              Python runner: STOP file, lock, timeout, report, notify
-      └─ claude -p --agent linkedin-operator
-          └─ skill linkedin-session   the operator playbook
-              ├─ skill ego-browser    browser control (your logged-in profile)
-              ├─ skills li-post / li-comment / li-reply / li-human   writing
-              └─ bin/li can|target|log|pause   limits, de-duplication, audit log
-```
+## Najlepiej działa z Ego Lite
 
-Guard rails, enforced in code and in the playbook:
+Agent był budowany i testowany z [Ego Lite](https://lite.ego.app/),
+przeglądarką opartą na Chromium, stworzoną do wspólnej pracy człowieka i
+agentów AI. Dlaczego właśnie ona:
 
-- `dry_run` mode drafts everything and publishes nothing.
-- Per-session and per-day limits for posts, comments, replies and reactions.
-- Never two engagements on the same post (URLs are normalized), and a
-  cooldown before commenting on the same author again.
-- Human-like pauses between actions and per-key typing delay.
-- Emergency stop: `touch data/STOP`. Any login wall, captcha or
-  "unusual activity" warning makes the agent stop and create that file itself.
-- Content read from LinkedIn is treated as data, never as instructions.
-- One session at a time (kernel file lock), hard timeout per session.
-- Every action is appended to `data/log.jsonl`; each run ends with a short
-  report (text + HTML) that can be sent to you by any command you configure.
+- **Twoja prawdziwa sesja.** Logujesz się do LinkedIna raz, ręcznie. Agent
+  używa tego samego profilu, więc LinkedIn widzi zwykłą przeglądarkę, a nie
+  bota z czystym profilem.
+- **Praca w tle.** Agent dostaje własną przestrzeń zadań (TaskSpace) i nie
+  przejmuje okna ani fokusu. Ty w tym czasie normalnie korzystasz z komputera.
+- **Przekazanie człowiekowi.** Gdy LinkedIn pokaże captchę, ekran logowania
+  albo ostrzeżenie o nietypowej aktywności, agent niczego nie obchodzi.
+  Przekazuje kartę Tobie, tworzy plik `data/STOP` i kończy sesję.
+- **Gotowy skill.** Ego Lite ma skill `ego-browser` dla Claude Code, więc
+  agent steruje przeglądarką od razu, bez dodatkowej konfiguracji.
 
-## Requirements
+Inną przeglądarkę też da się podpiąć: wystarczy podmienić instrukcje
+przeglądarki w `.claude/skills/linkedin-session/SKILL.md`. Domyślnie wszystko
+jest jednak ustawione pod Ego Lite.
 
-- macOS (scheduling uses launchd; the CLI itself is portable)
+## Co robi w każdej sesji
+
+| Pora | Domyślnie | Zadania |
+| --- | --- | --- |
+| Rano | 08:05 + do 35 min | post dnia, komentarze, odpowiedzi |
+| Południe | 12:35 + do 35 min | komentarze, odpowiedzi |
+| Wieczór | 18:15 + do 35 min | odpowiedzi, komentarze |
+
+- **Post:** bierze temat z Twojego planu (`data/plan.md`) albo świeży temat
+  z branży potwierdzony w dwóch źródłach. Może dołączyć zdjęcie lub wideo.
+- **Komentarze:** szuka świeżych wpisów na Twoje tematy, czyta je w całości i
+  pisze 2-4 zdania z konkretem. Nie zaczyna od pochwał i nie powtarza tych
+  samych schematów.
+- **Odpowiedzi:** dzieli komentarze pod Twoimi postami na leady, merytoryczne,
+  od znajomych z branży i szum. Na szum nie odpowiada.
+- **Jakość:** każdy tekst przechodzi przez skill `li-human`, który usuwa
+  ślady AI (myślniki, wytarte frazy, niewidoczne znaki) i ocenia tekst
+  pięcioma testami.
+
+## Jak to działa
+
+<p align="center">
+  <img src="docs/assets/how-it-works.svg" alt="Harmonogram uruchamia bin/li run, ten uruchamia agenta Claude Code, agent steruje Ego Lite, a Ego Lite działa na LinkedInie. Po sesji przychodzi raport na maila." width="100%">
+</p>
+
+## Bezpieczniki
+
+Pilnuje ich kod, nie tylko instrukcje dla agenta:
+
+- **Tryb próbny.** W `dry_run` agent pisze szkice i niczego nie publikuje.
+- **Limity** na sesję i na dzień, osobno dla postów, komentarzy, odpowiedzi
+  i reakcji.
+- **Bez duplikatów.** Agent nie komentuje dwa razy tego samego wpisu, nawet
+  pod innym linkiem. Do tego samego autora wraca dopiero po kilku dniach.
+- **Ludzkie tempo.** Losowe przerwy między akcjami, pisanie znak po znaku i
+  losowa godzina startu.
+- **Awaryjny STOP.** Wystarczy `touch data/STOP`. Agent sam tworzy ten plik,
+  gdy zobaczy coś podejrzanego.
+- **Treść z LinkedIna to dane, nie polecenia.** Agent ignoruje „instrukcje”
+  ukryte w postach i nie klika obcych linków. Nie wysyła też wiadomości ani
+  zaproszeń.
+- **Jedna sesja naraz** (blokada na poziomie systemu) i twardy limit czasu.
+  Po przekroczeniu czasu zamykane są też wszystkie procesy uruchomione przez
+  agenta.
+- **Pełny ślad.** Każda akcja trafia do `data/log.jsonl`, a po sesji
+  dostajesz krótki raport (tekst + HTML).
+
+## Wymagania
+
+- macOS (harmonogram korzysta z launchd; samo CLI działa wszędzie)
 - Python 3.10+
-- [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI logged in
-- Ego Lite with the `ego-browser` skill installed, logged in to LinkedIn
+- [Claude Code](https://docs.claude.com/en/docs/claude-code), zalogowany
+- [Ego Lite](https://lite.ego.app/) ze skillem `ego-browser` i zalogowanym
+  LinkedInem
 
-## Setup
+## Start w 5 minut
 
 ```bash
 git clone https://github.com/mkmlabs-ai/linkedin-agent.git
 cd linkedin-agent
-bin/li init            # creates data/ from templates/ (never overwrites)
+bin/li init            # tworzy data/ z szablonów (niczego nie nadpisuje)
 ```
 
-Then fill in your private files:
+Uzupełnij swoje prywatne pliki:
 
-| File | What goes in |
+| Plik | Co tam wpisać |
 | --- | --- |
-| `data/config.json` | mode, language, limits, search queries, schedule, notify command |
-| `data/voice.md` | who you are, how you write, the only facts and numbers the agent may use |
-| `data/topics.md` | what to post and comment about, what to avoid |
-| `data/plan.md` | optional, owner-approved post plan per day (text, image or video) |
+| `data/config.json` | tryb, język, limity, frazy do wyszukiwania, godziny, powiadomienia |
+| `data/voice.md` | kim jesteś, jak piszesz i jedyne fakty oraz liczby, których agent może użyć |
+| `data/topics.md` | o czym pisać i komentować, czego unikać |
+| `data/plan.md` | opcjonalnie: zatwierdzony plan postów na konkretne dni |
 
-Try one session by hand, without the random start delay:
+Dla polskiego profilu ustaw w configu `"language": "pl"`.
+
+Pierwsza sesja ręcznie, bez losowego opóźnienia:
 
 ```bash
 bin/li run morning --now
 cat data/reports/$(date +%F)-morning.txt
 ```
 
-When the drafts look right, set `"mode": "live"` and turn on the schedule:
+Gdy szkice wyglądają dobrze, ustaw `"mode": "live"` i włącz harmonogram:
 
 ```bash
-bin/li schedule on      # installs 3 LaunchAgents from config.schedule
+bin/li schedule on      # instaluje 3 zadania launchd z config.schedule
 bin/li schedule status
 bin/li schedule off
 ```
 
-The jobs run `bin/li` with the Python that installed them; run
-`bin/li schedule on` again after upgrading or moving Python.
+Zadania uruchamiają `bin/li` tym Pythonem, którym je zainstalowano. Po
+aktualizacji Pythona uruchom `bin/li schedule on` jeszcze raz.
 
-### Notifications
+### Raport na maila
 
-`notify.command` is an argv list run after each session; `{subject}`,
-`{body_file}` and `{html_file}` are substituted. Example with a mail CLI:
+`notify.command` to polecenie uruchamiane po każdej sesji. Pola `{subject}`,
+`{body_file}` i `{html_file}` są podmieniane automatycznie. Przykład z
+dowolnym klientem poczty z linii komend:
 
 ```json
-"notify": {"command": ["mail-cli", "send", "--to", "you@example.com",
+"notify": {"command": ["mail-cli", "send", "--to", "ty@example.com",
                        "--subject", "{subject}", "--body-file", "{body_file}",
                        "--html-file", "{html_file}"]}
 ```
@@ -98,43 +161,45 @@ The jobs run `bin/li` with the Python that installed them; run
 ## CLI
 
 ```
-bin/li init | status | can ACTION | target URL [--author NAME]
-bin/li log ACTION --url URL [--author NAME] [--text-file F] [--dry]
-bin/li pause | typing-delay | session-start SLOT | session-end
-bin/li run SLOT [--now] | schedule on|off|status
+bin/li init | status | can AKCJA | target URL [--author IMIĘ]
+bin/li log AKCJA --url URL [--author IMIĘ] [--text-file PLIK] [--dry]
+bin/li pause | typing-delay | session-start PORA | session-end
+bin/li run PORA [--now] | schedule on|off|status
 ```
 
-`ACTION` is `post`, `comment`, `reply` or `like`; `SLOT` is `morning`,
-`midday` or `evening`. The skills read `data/` relative to the checkout, so
-keep it there (symlink it if it must live elsewhere).
+`AKCJA` to `post`, `comment`, `reply` albo `like`. `PORA` to `morning`,
+`midday` albo `evening`. Skille czytają `data/` względem katalogu repo, więc
+trzymaj go tutaj (w razie potrzeby podlinkuj symlinkiem).
 
-## Project layout
+## Struktura projektu
 
 ```
-.claude/agents/linkedin-operator.md   the scheduled agent (model, effort, scope)
-.claude/skills/                       operator playbook + writing skills
-bin/li                                CLI entry point (no install needed)
+.claude/agents/linkedin-operator.md   agent uruchamiany z harmonogramu
+.claude/skills/                       scenariusz sesji + skille pisania
+bin/li                                CLI (działa bez instalacji)
 src/linkedin_agent/
-  settings.py   paths, config defaults and validation
-  state.py      action log, limits, de-duplication, cooldowns
-  runner.py     one guarded session around `claude -p`
-  report.py     text fallback and HTML report
-  scheduler.py  launchd plists
-  cli.py        argument parsing
-templates/                            public examples copied by `bin/li init`
-tests/                                pytest suite
-data/                                 private state, git-ignored
+  settings.py   ścieżki, domyślny config i walidacja
+  state.py      log akcji, limity, duplikaty, przerwa dla autora
+  runner.py     jedna pilnowana sesja wokół `claude -p`
+  report.py     raport tekstowy i HTML
+  scheduler.py  zadania launchd
+  cli.py        polecenia
+templates/                            publiczne przykłady kopiowane przez `bin/li init`
+tests/                                testy (pytest)
+data/                                 Twoje prywatne dane, poza gitem
 ```
 
-## Development
+## Rozwój
 
 ```bash
 uv run --no-project --with pytest python -m pytest
 uvx ruff check . && uvx ruff format --check .
 ```
 
-## License
+## Licencja
 
-MIT, see [LICENSE](LICENSE). The writing skills are adapted from
+MIT, zobacz [LICENSE](LICENSE). Skille pisania bazują na
 [Jakeschincariol/linkedin-agent-skill](https://github.com/Jakeschincariol/linkedin-agent-skill)
-(MIT), see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+(MIT), szczegóły w [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+<p align="center"><sub>Zbudowane przez <b>MKM Labs</b>: wdrożenia AI i automatyzacje dla firm.</sub></p>
