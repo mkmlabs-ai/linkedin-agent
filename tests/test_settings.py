@@ -55,3 +55,23 @@ def test_partial_nested_override_keeps_other_keys(paths):
     paths.config.write_text(json.dumps({"limits_per_day": {"comment": 3}}))
     cfg = load_config(paths)
     assert cfg.limits_per_day == {"comment": 3, "like": 55, "reply": 40, "post": 1}
+
+
+def test_user_schedule_replaces_default_slots():
+    cfg = parse_config({"schedule": {"times": {"morning": "07:30"}}})
+    assert cfg.schedule_times == {"morning": (7, 30)}
+
+
+def test_empty_schedule_is_rejected():
+    with pytest.raises(ConfigError, match="at least one session"):
+        parse_config({"schedule": {"times": {}}})
+
+
+def test_post_days():
+    from datetime import date
+
+    cfg = parse_config({"post_days": ["mon", "wed", "fri"]})
+    assert cfg.is_post_day(date(2026, 11, 2))  # Monday
+    assert not cfg.is_post_day(date(2026, 11, 3))  # Tuesday
+    with pytest.raises(ConfigError, match="post_days"):
+        parse_config({"post_days": ["monday"]})

@@ -12,6 +12,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ ACTIONS = ("comment", "like", "reply", "post")
 SLOTS = ("morning", "midday", "evening")
 MODES = ("dry_run", "live")
 SLOT_TASKS = ("post", "comments", "replies")
+WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 DEFAULTS: dict[str, Any] = {
     "mode": "dry_run",
@@ -32,6 +34,7 @@ DEFAULTS: dict[str, Any] = {
     "limits_per_session": {"comment": 8, "like": 20, "reply": 15, "post": 1},
     "limits_per_day": {"comment": 22, "like": 55, "reply": 40, "post": 1},
     "author_cooldown_days": 5,
+    "post_days": list(WEEKDAYS),
     "pause_seconds": {"min": 45, "max": 190},
     "typing_delay_ms": {"min": 35, "max": 110},
     "feed_search_queries": ["AI", "AI agents", "automation"],
@@ -139,6 +142,7 @@ class Config:
     limits_per_session: dict[str, int]
     limits_per_day: dict[str, int]
     author_cooldown_days: int
+    post_days: tuple[str, ...]
     pause_seconds: Range
     typing_delay_ms: Range
     runner: Runner
@@ -150,6 +154,9 @@ class Config:
     @property
     def live(self) -> bool:
         return self.mode == "live"
+
+    def is_post_day(self, day: date) -> bool:
+        return WEEKDAYS[day.weekday()] in self.post_days
 
 
 def _merge(base: dict[str, Any], over: dict[str, Any]) -> dict[str, Any]:
@@ -197,6 +204,13 @@ def parse_config(data: dict[str, Any]) -> Config:
         if bad:
             raise ConfigError(f"slots.{slot}: unknown tasks {bad}")
 
+    # The user's own schedule replaces the default one instead of merging
+    # into it, so leaving a slot out really means "no session at that time".
+    user_times = (data.get("schedule") or {}).get("times")
+    if user_times is not None:
+        raw["schedule"]["times"] = user_times
+    if not raw["schedule"]["times"]:
+        raise ConfigError("schedule.times: needs at least one session")
     times: dict[str, tuple[int, int]] = {}
     for slot, value in raw["schedule"]["times"].items():
         m = _TIME_RE.match(str(value))
@@ -207,6 +221,10 @@ def parse_config(data: dict[str, Any]) -> Config:
     cooldown = raw["author_cooldown_days"]
     if not isinstance(cooldown, int) or cooldown < 0:
         raise ConfigError("author_cooldown_days: must be a non-negative integer")
+
+    post_days = raw["post_days"]
+    if not isinstance(post_days, list) or any(d not in WEEKDAYS for d in post_days):
+        raise ConfigError(f"post_days: must be a list of {WEEKDAYS}")
 
     command = raw["notify"].get("command")
     if command is not None and (
@@ -235,6 +253,7 @@ def parse_config(data: dict[str, Any]) -> Config:
         limits_per_session=_limits(raw, "limits_per_session"),
         limits_per_day=_limits(raw, "limits_per_day"),
         author_cooldown_days=cooldown,
+        post_days=tuple(post_days),
         pause_seconds=_range(raw, "pause_seconds"),
         typing_delay_ms=_range(raw, "typing_delay_ms"),
         runner=runner,

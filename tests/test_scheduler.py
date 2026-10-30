@@ -8,7 +8,7 @@ from linkedin_agent.settings import load_config
 def test_plist_runs_the_cli_with_the_configured_time(paths):
     cfg = load_config(paths)
     plist = plistlib.loads(scheduler.build_plist(paths, cfg, "midday", "/opt/bin:/usr/bin"))
-    assert plist["Label"] == "com.example.linkedin-agent.midday"
+    assert plist["Label"] == "com.linkedin-agent.midday"
     assert plist["ProgramArguments"] == [sys.executable, str(paths.root / "bin" / "li"), "run", "midday"]
     assert plist["StartCalendarInterval"] == {"Hour": 12, "Minute": 35}
     assert plist["EnvironmentVariables"]["PATH"] == "/opt/bin:/usr/bin"

@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 authors = [{ name = "MKM Labs" }]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = []
 classifiers = ["Operating System :: MacOS", "Programming Language :: Python :: 3"]
 
@@ -30,7 +30,7 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py39"
 extend-exclude = [".claude/skills/li-human"]
 
 [tool.ruff.lint]

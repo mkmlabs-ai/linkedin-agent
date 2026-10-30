@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/mkmlabs-ai/linkedin-agent/actions/workflows/ci.yml"><img src="https://github.com/mkmlabs-ai/linkedin-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/python-3.10%2B-3776ab" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/python-3.9%2B-3776ab" alt="Python 3.9+">
   <img src="https://img.shields.io/badge/Claude%20Code-agent-d97757" alt="Claude Code">
   <img src="https://img.shields.io/badge/przegl%C4%85darka-Ego%20Lite-7c5cff" alt="Ego Lite">
   <img src="https://img.shields.io/badge/licencja-MIT-22c55e" alt="MIT">
@@ -27,6 +27,83 @@ bez okna oraz przeglądarka [Ego Lite](https://lite.ego.app/).
   folderze `data/`, który nigdy nie trafia do repozytorium.
 - **Żadnych loginów ani haseł w kodzie.** Agent korzysta z sesji, w której
   sam się zalogowałeś w Ego Lite. Ciasteczka nie opuszczają Twojego komputera.
+
+## Instalacja krok po kroku (bez znajomości GitHuba)
+
+Nie musisz umieć programować. Instaluje i konfiguruje wszystko Claude, a Ty
+tylko odpowiadasz na kilka pytań, klikając gotowe odpowiedzi.
+
+**Potrzebujesz:** Maca, płatnego konta Claude (Pro, Max lub wyższego;
+darmowy plan nie obejmuje Claude Code) i około 20 minut.
+
+### 1. Zainstaluj Claude Code
+
+1. Otwórz **Terminal**: naciśnij `⌘ + spacja`, wpisz `Terminal`, Enter.
+2. Wklej to polecenie i naciśnij Enter:
+
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+
+3. Zamknij Terminal, otwórz go jeszcze raz, wpisz `claude` i naciśnij
+   Enter. Za pierwszym razem otworzy się przeglądarka: zaloguj się na swoje
+   konto Claude.
+
+### 2. Zainstaluj Ego Lite i zaloguj się do LinkedIna
+
+1. Pobierz Ego Lite ze strony [lite.ego.app](https://lite.ego.app/) i
+   zainstaluj jak każdą aplikację.
+2. Otwórz Ego Lite i przejdź przez ekran powitalny (możesz zaimportować dane
+   z Chrome).
+3. Wejdź w Ego Lite na [linkedin.com](https://www.linkedin.com) i zaloguj
+   się. Hasło wpisujesz tylko Ty, agent go nigdy nie widzi.
+
+### 3. Wklej Claude'owi jedną wiadomość
+
+W oknie Claude Code z kroku 1 wklej:
+
+```text
+Zainstaluj mi agenta LinkedIn z https://github.com/mkmlabs-ai/linkedin-agent.
+Pobierz go do folderu ~/linkedin-agent (przez git clone, a jeśli nie ma gita,
+pobierz ZIP z GitHuba i rozpakuj). Potem przeczytaj plik
+~/linkedin-agent/.claude/skills/setup/SKILL.md i przeprowadź mnie przez
+konfigurację krok po kroku, po polsku.
+```
+
+Claude będzie pytał o zgodę na polecenia: klikaj **Tak**.
+
+### 4. Odpowiedz na pytania kreatora
+
+<p align="center">
+  <img src="docs/assets/wizard.svg" alt="Kreator w Claude Code: krok 3 z 9, pytanie Ile razy dziennie agent ma zaglądać na LinkedIna, odpowiedzi do kliknięcia." width="100%">
+</p>
+
+Kreator sam sprawdzi komputer i doinstaluje braki, a potem zapyta:
+
+- ile razy dziennie agent ma zaglądać na LinkedIna i o których godzinach,
+- jak często publikować własne posty i jak aktywnie komentować,
+- czym się zajmujesz, do kogo piszesz i o czym chcesz mówić,
+- skąd wziąć Twój styl pisania (może przeczytać Twoje ostatnie posty),
+- czy chcesz powiadomienie na Macu po każdej sesji.
+
+Na koniec pokaże próbny post i komentarz napisane Twoim stylem. Poprawisz
+je, jeśli trzeba, a potem włączy harmonogram. Domyślnie agent startuje w
+**trybie próbnym**: przez pierwsze dni pisze szkice i niczego nie publikuje.
+
+### 5. Na co dzień
+
+Otwórz Terminal, wpisz `cd ~/linkedin-agent && claude` i po prostu napisz:
+
+| Napisz | Co się stanie |
+| --- | --- |
+| `co dziś zrobił agent?` | podsumowanie dnia i ostatni raport |
+| `przełącz agenta LinkedIn na live` | agent zacznie publikować naprawdę |
+| `zatrzymaj agenta LinkedIn` | pauza, żadna sesja nie ruszy |
+| `wznów agenta` | koniec pauzy |
+| `skonfiguruj agenta` | kreator od nowa, np. inne tematy albo godziny |
+
+Mac może być uśpiony: zaległa sesja ruszy po wybudzeniu. Ego Lite może
+działać w tle.
 
 > [!WARNING]
 > Regulamin LinkedIna ogranicza automatyzację konta. Uruchamiasz agenta na
@@ -104,12 +181,12 @@ Pilnuje ich kod, nie tylko instrukcje dla agenta:
 ## Wymagania
 
 - macOS (harmonogram korzysta z launchd; samo CLI działa wszędzie)
-- Python 3.10+
+- Python 3.9+ (ten z macOS wystarczy)
 - [Claude Code](https://docs.claude.com/en/docs/claude-code), zalogowany
 - [Ego Lite](https://lite.ego.app/) ze skillem `ego-browser` i zalogowanym
   LinkedInem
 
-## Start w 5 minut
+## Ręczna instalacja (dla technicznych)
 
 ```bash
 git clone https://github.com/mkmlabs-ai/linkedin-agent.git
@@ -117,7 +194,8 @@ cd linkedin-agent
 bin/li init            # tworzy data/ z szablonów (niczego nie nadpisuje)
 ```
 
-Uzupełnij swoje prywatne pliki:
+Najprościej: uruchom w tym folderze `claude` i napisz `skonfiguruj agenta`.
+Kreator zrobi resztę. Ręcznie uzupełnisz swoje prywatne pliki tak:
 
 | Plik | Co tam wpisać |
 | --- | --- |
@@ -165,7 +243,11 @@ bin/li init | status | can AKCJA | target URL [--author IMIĘ]
 bin/li log AKCJA --url URL [--author IMIĘ] [--text-file PLIK] [--dry]
 bin/li pause | typing-delay | session-start PORA | session-end
 bin/li run PORA [--now] | schedule on|off|status
+bin/li doctor [--json] | stop [POWÓD] | resume
 ```
+
+`bin/li doctor` sprawdza Pythona, Claude Code, Ego Lite, config, pliki głosu
+i harmonogram, i przy każdym braku podpowiada, co zrobić.
 
 `AKCJA` to `post`, `comment`, `reply` albo `like`. `PORA` to `morning`,
 `midday` albo `evening`. Skille czytają `data/` względem katalogu repo, więc
@@ -175,6 +257,7 @@ trzymaj go tutaj (w razie potrzeby podlinkuj symlinkiem).
 
 ```
 .claude/agents/linkedin-operator.md   agent uruchamiany z harmonogramu
+.claude/skills/setup/                 kreator pierwszego uruchomienia
 .claude/skills/                       scenariusz sesji + skille pisania
 bin/li                                CLI (działa bez instalacji)
 src/linkedin_agent/
@@ -183,6 +266,7 @@ src/linkedin_agent/
   runner.py     jedna pilnowana sesja wokół `claude -p`
   report.py     raport tekstowy i HTML
   scheduler.py  zadania launchd
+  doctor.py     sprawdzenie środowiska
   cli.py        polecenia
 templates/                            publiczne przykłady kopiowane przez `bin/li init`
 tests/                                testy (pytest)

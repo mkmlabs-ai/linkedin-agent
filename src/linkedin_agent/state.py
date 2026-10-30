@@ -114,19 +114,24 @@ class Usage:
     session: dict[str, int]
     remaining: dict[str, int]
 
+    post_day: bool = True
+
     def allows(self, action: str) -> bool:
+        if action == "post" and not self.post_day:
+            return False
         return self.remaining[action] > 0
 
 
 def usage(cfg: Config, rows: list[dict[str, Any]], session: dict[str, Any], now: datetime | None = None) -> Usage:
-    day = (now or datetime.now()).date().isoformat()
+    today_date = (now or datetime.now()).date()
+    day = today_date.isoformat()
     today = counts(rows, day)
     # A session that crosses midnight keeps its count; without a session
     # window, fall back to today's actions.
     started = session.get("started")
     ses = counts(rows, since=started) if started else today
     remaining = {a: max(0, min(cfg.limits_per_session[a] - ses[a], cfg.limits_per_day[a] - today[a])) for a in ACTIONS}
-    return Usage(today, ses, remaining)
+    return Usage(today, ses, remaining, cfg.is_post_day(today_date))
 
 
 def check_target(

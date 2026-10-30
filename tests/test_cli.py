@@ -37,3 +37,36 @@ def test_bad_config_exits_2_with_message(paths, capsys):
 def test_typing_delay_in_range(paths, capsys):
     main(["typing-delay"])
     assert 35 <= int(capsys.readouterr().out) <= 110
+
+
+def test_post_refused_outside_post_days(paths, write_config, capsys):
+    from datetime import datetime
+
+    today = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")[datetime.now().weekday()]
+    others = [d for d in ("mon", "tue", "wed", "thu", "fri", "sat", "sun") if d != today]
+    write_config(post_days=others)
+    assert main(["can", "post"]) == 1
+    assert "not a posting day" in capsys.readouterr().out
+    write_config(post_days=[today])
+    assert main(["can", "post"]) == 0
+
+
+def test_stop_and_resume(paths, capsys):
+    assert main(["stop", "holiday"]) == 0
+    assert "holiday" in paths.stop.read_text()
+    assert main(["resume"]) == 0
+    assert not paths.stop.exists()
+    assert "holiday" in capsys.readouterr().out
+
+
+def test_doctor_flags_template_voice(paths, capsys, monkeypatch):
+    from linkedin_agent import scheduler
+
+    monkeypatch.setattr(scheduler, "loaded", lambda cfg: [])
+    main(["init"])
+    capsys.readouterr()
+    assert main(["doctor", "--json"]) == 1
+    checks = {c["name"]: c for c in json.loads(capsys.readouterr().out)}
+    assert checks["voice.md"]["ok"] is False
+    assert checks["config"]["ok"] is True
+    assert checks["stop_file"]["ok"] is True

@@ -9,6 +9,8 @@ pause                             sleep a random human-like pause
 typing-delay                      print a random per-key delay in ms
 session-start SLOT / session-end  mark the session window
 run SLOT [--now]                  one scheduled session (used by launchd)
+doctor [--json]                   check Python, Claude Code, Ego Lite, config, schedule
+stop [REASON] / resume            pause or resume all sessions
 schedule on|off|status            install or remove the launchd jobs
 """
 
@@ -22,10 +24,10 @@ import sys
 import time
 from collections.abc import Sequence
 
-from . import scheduler
+from . import doctor, scheduler
 from .runner import SessionRunner
 from .settings import ACTIONS, SLOTS, ConfigError, Paths, load_config, project_root
-from .state import Store, check_target, make_row, read_text, usage
+from .state import Store, check_target, make_row, now_iso, read_text, usage
 
 TEMPLATES = {
     "config.example.json": "config.json",
@@ -64,6 +66,7 @@ def cmd_status(paths: Paths, _: argparse.Namespace) -> int:
             "today": u.today,
             "this_session": u.session,
             "remaining_session": u.remaining,
+            "post_day": u.post_day,
         }
     )
     return 0
@@ -75,7 +78,10 @@ def cmd_can(paths: Paths, a: argparse.Namespace) -> int:
     if u.allows(a.action):
         print("OK")
         return 0
-    print(f"LIMIT {a.action}: session {u.session[a.action]}, day {u.today[a.action]}")
+    if a.action == "post" and not u.post_day:
+        print("LIMIT post: today is not a posting day (config post_days)")
+    else:
+        print(f"LIMIT {a.action}: session {u.session[a.action]}, day {u.today[a.action]}")
     return 1
 
 
@@ -118,6 +124,33 @@ def cmd_session_end(paths: Paths, _: argparse.Namespace) -> int:
     started = session.get("started")
     drafts = sum(1 for r in rows if r.get("dry") and started and str(r["ts"]) >= started)
     _print_json({"session": session, "done": usage(cfg, rows, session).session, "dry_run_drafts": drafts})
+    return 0
+
+
+def cmd_doctor(paths: Paths, a: argparse.Namespace) -> int:
+    checks = doctor.run_checks(paths)
+    if a.json:
+        _print_json(doctor.as_dicts(checks))
+    else:
+        for c in checks:
+            print(f"{'OK ' if c.ok else 'FIX'}  {c.name:<10} {c.detail}")
+            if not c.ok and c.fix:
+                print(f"     {'':<10} -> {c.fix}")
+    return 0 if all(c.ok for c in checks) else 1
+
+
+def cmd_stop(paths: Paths, a: argparse.Namespace) -> int:
+    paths.data.mkdir(parents=True, exist_ok=True)
+    paths.stop.write_text(f"{now_iso()} {a.reason}\n", encoding="utf-8")
+    print("STOPPED: no session will run until `bin/li resume`")
+    return 0
+
+
+def cmd_resume(paths: Paths, _: argparse.Namespace) -> int:
+    if paths.stop.exists():
+        print("STOP reason was:", paths.stop.read_text(encoding="utf-8").strip())
+        paths.stop.unlink()
+    print("RESUMED")
     return 0
 
 
@@ -167,6 +200,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("slot", choices=SLOTS)
     p.add_argument("--now", action="store_true", help="skip the random start delay")
     p.set_defaults(f=cmd_run)
+    p = sp.add_parser("doctor", help="check that everything needed is installed")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(f=cmd_doctor)
+    p = sp.add_parser("stop", help="pause the agent (creates data/STOP)")
+    p.add_argument("reason", nargs="?", default="stopped by the owner")
+    p.set_defaults(f=cmd_stop)
+    sp.add_parser("resume", help="remove data/STOP").set_defaults(f=cmd_resume)
     p = sp.add_parser("schedule", help="manage launchd jobs (macOS)")
     p.add_argument("state", choices=("on", "off", "status"))
     p.set_defaults(f=cmd_schedule)
