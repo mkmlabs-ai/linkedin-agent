@@ -45,11 +45,7 @@ PL_PERSON = re.compile(
     r"|\b[^\W\d_]+(?:łem|łam|łeś|łaś|liśmy|łyśmy|liście|łyście)\b",
     re.IGNORECASE,
 )
-PL_LETTERS = set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
 
-
-def is_polish(text):
-    return any(c in PL_LETTERS for c in text)
 NUMBERS = re.compile(r"\b\d[\d,.]*%?\b|\$\d")
 PROPER_CANDIDATE = re.compile(r"(?<![.!?]\s)(?<!^)\b[^\W\d_]{3,}\b", re.MULTILINE)
 
@@ -143,9 +139,9 @@ def check_voice(text, lex):
     if len(w) < 25:
         return 50.0, TOO_SHORT
     per100 = 100 / len(w)
-    polish = is_polish(text)
     contractions = len(CONTRACTIONS.findall(text)) * per100
-    person = len((PL_PERSON if polish else PRONOUNS).findall(text)) * per100
+    person_en = len(PRONOUNS.findall(text)) * per100
+    person_pl = len(PL_PERSON.findall(text)) * per100
     tells = 0
     names = []
     for s in lex["structures"]:
@@ -158,14 +154,16 @@ def check_voice(text, lex):
             names.append(s["id"])
     bullets = [len(b.split()) for b in re.findall(r"(?m)^\s*[-*•]\s+(.+)$", text)]
     uniform = (len(bullets) >= 3 and statistics.pstdev(bullets) < 1.6)
-    if polish:
-        # Polish has no contractions: weigh person and structure only.
-        score = (scale(person, human=6.0, machine=0.5) * 0.55
-                 + clamp(100 - tells * 22) * 0.45)
-    else:
-        score = (scale(contractions, human=3.0, machine=0.0) * 0.35
-                 + scale(person, human=8.0, machine=1.0) * 0.35
-                 + clamp(100 - tells * 22) * 0.30)
+    # Score the English reading (contractions + pronouns) and the Polish one
+    # (person markers, Polish has no contractions) and keep the better, so
+    # mixed text or a single Polish name never flips the verdict.
+    structure = clamp(100 - tells * 22)
+    score_en = (scale(contractions, human=3.0, machine=0.0) * 0.35
+                + scale(person_en, human=8.0, machine=1.0) * 0.35
+                + structure * 0.30)
+    score_pl = scale(person_pl, human=6.0, machine=0.5) * 0.55 + structure * 0.45
+    polish = score_pl > score_en
+    score, person = (score_pl, person_pl) if polish else (score_en, person_en)
     if uniform:
         score -= 12
         names.append("uniform-bullets")

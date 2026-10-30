@@ -62,3 +62,13 @@ def test_weakest_signal_ignores_too_short_checks(capsys):
     results["SPECIFICITY"] = (60.0, "few markers")
     detect.render(results, 65.0, "REVIEW")
     assert "Weakest signal: SPECIFICITY" in capsys.readouterr().out
+
+
+def test_one_polish_name_does_not_flip_an_english_comment():
+    detect = load("detect")
+    english = (
+        "We shipped the same agent for a client in {city} last month and I'd say you're right about the cost. "
+        "Our team didn't expect the review step to take longer than the build itself, but it did, twice."
+    )
+    lodz, plain = (detect.check_voice(english.format(city=c), lexicon())[0] for c in ("Łódź", "Lodz"))
+    assert lodz == plain
