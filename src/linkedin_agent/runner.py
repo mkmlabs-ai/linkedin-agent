@@ -7,6 +7,7 @@ exists -> render HTML -> optional notification command.
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import os
 import random
@@ -76,20 +77,36 @@ def notify_command(cfg: Config, subject: str, body_file: Path, html_file: Path) 
     return [arg.format(**values) for arg in cfg.notify_command]
 
 
+def _group_alive(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _kill_group(proc: subprocess.Popen, grace: float = 10.0) -> None:
-    for sig, wait in ((signal.SIGTERM, grace), (signal.SIGKILL, None)):
-        try:
-            os.killpg(proc.pid, sig)
-        except ProcessLookupError:
+    """SIGTERM the whole group, wait until every member is gone (not just the
+    leader), then SIGKILL whatever is left."""
+    pgid = proc.pid
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    deadline = time.monotonic() + grace
+    while time.monotonic() < deadline:
+        proc.poll()  # reap the leader so its zombie does not keep the group "alive"
+        if not _group_alive(pgid):
             return
-        try:
-            proc.wait(timeout=wait)
-            return
-        except subprocess.TimeoutExpired:
-            continue
+        time.sleep(0.1)
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(pgid, signal.SIGKILL)
+    proc.wait()
 
 
-def run_agent(cmd: list[str], *, cwd: Path, stdout: IO[str], timeout: float) -> int:
+def run_agent(cmd: list[str], *, cwd: Path, stdout: IO[str], timeout: float, grace: float = 10.0) -> int:
     """Run the agent in its own process group and, whatever happens, kill the
     whole group before returning, so no browser or shell tool it spawned can
     keep acting after the session lock is released."""
@@ -97,7 +114,7 @@ def run_agent(cmd: list[str], *, cwd: Path, stdout: IO[str], timeout: float) -> 
     try:
         return proc.wait(timeout=timeout)
     finally:
-        _kill_group(proc)
+        _kill_group(proc, grace)
 
 
 def _tail(path: Path, lines: int = 25) -> str:

@@ -39,3 +39,26 @@ def test_short_comment_can_pass_when_clean():
     assert verdict != "FLAGGED"
     judged_only = detect.run("Krótko.", lexicon())
     assert judged_only[2] in {"PASS", "REVIEW", "FLAGGED"}
+
+
+POLISH_COMMENT = (
+    "Mieliśmy dokładnie to samo u klienta z branży produkcyjnej w Łodzi. "
+    "Zrobiłem audyt procesów w tydzień i wyszło, że połowa maili to powtarzalne zamówienia. "
+    "Agent ogarnia je teraz sam. Wy też to liczyliście przed wdrożeniem?"
+)
+
+
+def test_plain_polish_comment_can_pass_voice():
+    detect = load("detect")
+    score, detail = detect.check_voice(POLISH_COMMENT, lexicon())
+    assert score >= 55, detail
+    assert "person markers" in detail
+
+
+def test_weakest_signal_ignores_too_short_checks(capsys):
+    detect = load("detect")
+    results = {c: (90.0, "ok") for c in detect.CHECKS}
+    results["BURSTINESS"] = (50.0, detect.TOO_SHORT)
+    results["SPECIFICITY"] = (60.0, "few markers")
+    detect.render(results, 65.0, "REVIEW")
+    assert "Weakest signal: SPECIFICITY" in capsys.readouterr().out

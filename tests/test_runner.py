@@ -193,3 +193,13 @@ def test_tools_left_behind_after_normal_exit_are_killed(tmp_path):
         assert run_agent(["/bin/sh", "-c", f"(sleep 1; touch {marker}) &"], cwd=tmp_path, stdout=log, timeout=5) == 0
     time.sleep(1.5)
     assert not marker.exists()
+
+
+def test_grandchild_ignoring_sigterm_is_killed(tmp_path):
+    marker = tmp_path / "survived"
+    script = f"(trap '' TERM; sleep 1.5; touch {marker}) & exit 0"
+    with (tmp_path / "log").open("w") as log:
+        rc = run_agent(["/bin/sh", "-c", script], cwd=tmp_path, stdout=log, timeout=5, grace=0.3)
+    assert rc == 0
+    time.sleep(2)
+    assert not marker.exists()

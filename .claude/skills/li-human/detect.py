@@ -38,6 +38,18 @@ SENT_RE = re.compile(r"[^.!?\n]+[.!?]*")
 WORD_RE = re.compile(r"[^\W\d_]+(?:'[^\W\d_]+)*")
 CONTRACTIONS = re.compile(r"\b\w+'(?:s|t|re|ve|ll|d|m)\b", re.IGNORECASE)
 PRONOUNS = re.compile(r"\b(i|me|my|mine|we|us|our|you|your)\b", re.IGNORECASE)
+# Polish marks person mostly in verb endings, so count those with the pronouns.
+PL_PERSON = re.compile(
+    r"\b(?:ja|mnie|mi|mój|moja|moje|my|nas|nam|nasz|nasza|nasze|ty|ciebie|cię|tobie|twój|twoja|twoje"
+    r"|wy|was|wam|wasz|wasza|wasze)\b"
+    r"|\b[^\W\d_]+(?:łem|łam|łeś|łaś|liśmy|łyśmy|liście|łyście)\b",
+    re.IGNORECASE,
+)
+PL_LETTERS = set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
+
+
+def is_polish(text):
+    return any(c in PL_LETTERS for c in text)
 NUMBERS = re.compile(r"\b\d[\d,.]*%?\b|\$\d")
 PROPER_CANDIDATE = re.compile(r"(?<![.!?]\s)(?<!^)\b[^\W\d_]{3,}\b", re.MULTILINE)
 
@@ -131,8 +143,9 @@ def check_voice(text, lex):
     if len(w) < 25:
         return 50.0, TOO_SHORT
     per100 = 100 / len(w)
+    polish = is_polish(text)
     contractions = len(CONTRACTIONS.findall(text)) * per100
-    person = len(PRONOUNS.findall(text)) * per100
+    person = len((PL_PERSON if polish else PRONOUNS).findall(text)) * per100
     tells = 0
     names = []
     for s in lex["structures"]:
@@ -145,14 +158,22 @@ def check_voice(text, lex):
             names.append(s["id"])
     bullets = [len(b.split()) for b in re.findall(r"(?m)^\s*[-*•]\s+(.+)$", text)]
     uniform = (len(bullets) >= 3 and statistics.pstdev(bullets) < 1.6)
-    score = (scale(contractions, human=3.0, machine=0.0) * 0.35
-             + scale(person, human=8.0, machine=1.0) * 0.35
-             + clamp(100 - tells * 22) * 0.30)
+    if polish:
+        # Polish has no contractions: weigh person and structure only.
+        score = (scale(person, human=6.0, machine=0.5) * 0.55
+                 + clamp(100 - tells * 22) * 0.45)
+    else:
+        score = (scale(contractions, human=3.0, machine=0.0) * 0.35
+                 + scale(person, human=8.0, machine=1.0) * 0.35
+                 + clamp(100 - tells * 22) * 0.30)
     if uniform:
         score -= 12
         names.append("uniform-bullets")
-    detail = (f"{contractions:.1f} contractions, {person:.1f} personal pronouns "
-              f"per 100 words, {tells} structural tell(s)")
+    if polish:
+        detail = f"{person:.1f} person markers per 100 words, {tells} structural tell(s)"
+    else:
+        detail = (f"{contractions:.1f} contractions, {person:.1f} personal pronouns "
+                  f"per 100 words, {tells} structural tell(s)")
     if names:
         detail += " [" + ", ".join(names[:4]) + "]"
     return clamp(score), detail
@@ -195,7 +216,8 @@ def render(results, overall, verdict, label=None, out=sys.stdout):
     print("-" * 62, file=out)
     print(f"  {'HUMAN SCORE':<13} {bar(overall)} {overall:5.1f}   {verdict}", file=out)
     if verdict != "PASS":
-        weakest = min(CHECKS, key=lambda c: results[c][0])
+        judged = [c for c in CHECKS if results[c][1] != TOO_SHORT] or CHECKS
+        weakest = min(judged, key=lambda c: results[c][0])
         print(f"\n  Weakest signal: {weakest}. Fix that first.", file=out)
     print("", file=out)
 
