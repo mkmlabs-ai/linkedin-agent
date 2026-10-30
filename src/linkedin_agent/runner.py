@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import IO
 
 from .report import fallback_text, parse_notes, render_html
-from .settings import Config, Paths, find_cli
+from .settings import Config, Paths, find_cli, with_extra_bin_dirs
 from .state import Store, now_iso
 
 TIMEOUT_RC = 124
@@ -110,7 +110,10 @@ def run_agent(cmd: list[str], *, cwd: Path, stdout: IO[str], timeout: float, gra
     """Run the agent in its own process group and, whatever happens, kill the
     whole group before returning, so no browser or shell tool it spawned can
     keep acting after the session lock is released."""
-    proc = subprocess.Popen(cmd, cwd=cwd, stdout=stdout, stderr=subprocess.STDOUT, start_new_session=True)
+    # The agent shells out to `ego-browser` and friends: give it the same
+    # extended PATH that `bin/li doctor` checks against.
+    env = {**os.environ, "PATH": with_extra_bin_dirs(os.environ.get("PATH", ""))}
+    proc = subprocess.Popen(cmd, cwd=cwd, stdout=stdout, stderr=subprocess.STDOUT, env=env, start_new_session=True)
     try:
         return proc.wait(timeout=timeout)
     finally:

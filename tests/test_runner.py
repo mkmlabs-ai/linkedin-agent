@@ -214,3 +214,11 @@ def test_grandchild_ignoring_sigterm_is_killed(tmp_path):
 def test_claude_resolved_to_absolute_path(paths, monkeypatch):  # overrides the autouse stub
     monkeypatch.setattr("linkedin_agent.runner.find_cli", lambda name: f"/home/u/.local/bin/{name}")
     assert claude_command(load_config(paths), "x")[0] == "/home/u/.local/bin/claude"
+
+
+def test_agent_gets_extended_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    out = tmp_path / "path.txt"
+    with (tmp_path / "log").open("w") as log:
+        run_agent(["/bin/sh", "-c", f'echo "$PATH" > {out}'], cwd=tmp_path, stdout=log, timeout=5)
+    assert "/.local/bin" in out.read_text()
