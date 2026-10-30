@@ -1,0 +1,35 @@
+{
+  "mode": "dry_run",
+  "language": "en",
+  "ego_task_space": "linkedin-agent",
+  "slots": {
+    "morning": ["post", "comments", "replies"],
+    "midday": ["comments", "replies"],
+    "evening": ["replies", "comments"]
+  },
+  "limits_per_session": {"comment": 8, "like": 20, "reply": 15, "post": 1},
+  "limits_per_day": {"comment": 22, "like": 55, "reply": 40, "post": 1},
+  "author_cooldown_days": 5,
+  "pause_seconds": {"min": 45, "max": 190},
+  "typing_delay_ms": {"min": 35, "max": 110},
+  "feed_search_queries": ["AI agents", "AI automation", "LLM in production", "AI adoption"],
+  "min_post_reactions_to_comment": 0,
+  "max_post_age_hours": 168,
+  "runner": {
+    "claude_bin": "claude",
+    "agent": "linkedin-operator",
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "timeout_minutes": 90,
+    "jitter_minutes": 35,
+    "browser_app": "/Applications/ego lite.app",
+    "browser_process": "ego lite"
+  },
+  "schedule": {
+    "label_prefix": "com.example.linkedin-agent",
+    "times": {"morning": "08:05", "midday": "12:35", "evening": "18:15"}
+  },
+  "notify": {
+    "command": null
+  }
+}

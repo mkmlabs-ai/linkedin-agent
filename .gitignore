@@ -1,0 +1,16 @@
+# Private, per-account state: voice, topics, plan, config, logs, drafts, media.
+/data/
+# Local research notes.
+/research/
+.claude/settings.local.json
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+dist/
+build/
+.DS_Store
+/.review/
