@@ -3,9 +3,9 @@
   "language": "en",
   "ego_task_space": "linkedin-agent",
   "slots": {
-    "morning": ["post", "comments", "replies"],
-    "midday": ["comments", "replies"],
-    "evening": ["replies", "comments"]
+    "morning": ["post", "comments", "reactions", "replies"],
+    "midday": ["comments", "reactions", "replies"],
+    "evening": ["replies", "comments", "reactions"]
   },
   "limits_per_session": {"comment": 8, "like": 20, "reply": 15, "post": 1},
   "limits_per_day": {"comment": 22, "like": 55, "reply": 40, "post": 1},

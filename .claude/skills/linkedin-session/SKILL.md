@@ -100,23 +100,41 @@ skill does posts, comments, replies and reactions only.
    2-4 sentences; never a type already used in the previous comment of this
    session; never open with praise). Language = language of the post.
    Run `li-human`. Apply section 6. Save to `data/drafts/<ts>-comment-<author-slug>.md`.
-5. Optionally react (`can like` OK) with Like/Insightful before commenting,
-   pause, then comment. Not every post needs a reaction.
+5. React to every post you comment on, before commenting (see section 4a,
+   steps 3-4), pause, then comment.
 6. live: open the comment box of that exact post, type, submit, verify your
    comment is visible under the post. dry_run: type nothing, keep the draft.
 7. `bin/li log comment --url <post-url> --author "<name>" --text-file <draft>`
    (and `log like ...` if you reacted). Pause.
 8. Stop the round when the session limit is hit or after 12 candidates read.
 
-## 5. Task: replies under the owner's posts
+## 4a. Task: reactions
+
+Reactions are a required part of the session. Besides the posts you comment on,
+react to at least 5 more posts per session, as long as `can like` prints OK and
+enough good posts exist; if there are fewer, say why in the report.
+
+1. Candidates: the posts collected in section 4 that fit `data/topics.md` but
+   got no comment, including authors on comment cooldown, plus good comments
+   under the owner's posts. Same exclusions: no ads, job posts, polls, giveaways.
+2. Read the post first. Never react to something you have not read.
+3. `bin/li target <post-url> --author "<name>" --action like` and `can like`
+   must both print OK.
+4. Use Like for most, Insightful/Wnikliwe when the post teaches something
+   concrete. live: click it and verify the button shows the reaction as active.
+   dry_run: no click.
+5. `bin/li log like --url <post-url> --author "<name>"`. Pause.
+
+## 5. Task: replies under the owner's posts and comments
 
 1. Open the owner's recent activity (Me → Posts) and the notifications tab
-   for comments on the owner's posts from the last 3 days.
+   for the last 3 days: comments on the owner's posts and replies to the
+   owner's comments under other people's posts.
 2. Collect top-level comments and direct replies to the owner that have no
    answer from the owner yet.
 3. Triage and write with `li-reply` (lead / substance / peer / support /
    noise; noise gets no reply). Run `li-human`, apply section 6.
-4. For each: `target <comment-permalink-or-post-url#commenter>`, `can reply`,
+4. For each: `target <comment-permalink-or-post-url#commenter> --author "<name>" --action reply`, `can reply`,
    then live: click Reply on that comment, type, submit, verify. Log with
    `log reply`. Pause between replies.
 

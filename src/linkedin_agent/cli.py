@@ -3,7 +3,8 @@
 init                              copy templates/ into data/ (never overwrites)
 status                            mode, today's counters, remaining limits
 can ACTION                        exit 0 if ACTION is within limits
-target URL [--author NAME]        exit 0 if URL is new and author not in cooldown
+target URL [--author NAME] [--action comment|reply|like]
+                                  exit 0 if URL is new (comment: and author not in cooldown)
 log ACTION --url U [--author A] [--text-file F] [--dry]
 pause                             sleep a random human-like pause
 typing-delay                      print a random per-key delay in ms
@@ -86,7 +87,7 @@ def cmd_can(paths: Paths, a: argparse.Namespace) -> int:
 
 
 def cmd_target(paths: Paths, a: argparse.Namespace) -> int:
-    ok, reason = check_target(load_config(paths), Store(paths).entries(), a.url, a.author)
+    ok, reason = check_target(load_config(paths), Store(paths).entries(), a.url, a.author, action=a.action)
     print("OK" if ok else f"SKIP {reason}")
     return 0 if ok else 1
 
@@ -182,6 +183,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sp.add_parser("target")
     p.add_argument("url")
     p.add_argument("--author")
+    p.add_argument("--action", choices=("comment", "reply", "like"), default="comment")
     p.set_defaults(f=cmd_target)
     p = sp.add_parser("log")
     p.add_argument("action", choices=ACTIONS)

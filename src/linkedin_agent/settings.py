@@ -20,7 +20,7 @@ from typing import Any
 ACTIONS = ("comment", "like", "reply", "post")
 SLOTS = ("morning", "midday", "evening")
 MODES = ("dry_run", "live")
-SLOT_TASKS = ("post", "comments", "replies")
+SLOT_TASKS = ("post", "comments", "reactions", "replies")
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 DEFAULTS: dict[str, Any] = {
@@ -28,9 +28,9 @@ DEFAULTS: dict[str, Any] = {
     "language": "en",
     "ego_task_space": "linkedin-agent",
     "slots": {
-        "morning": ["post", "comments", "replies"],
-        "midday": ["comments", "replies"],
-        "evening": ["replies", "comments"],
+        "morning": ["post", "comments", "reactions", "replies"],
+        "midday": ["comments", "reactions", "replies"],
+        "evening": ["replies", "comments", "reactions"],
     },
     "limits_per_session": {"comment": 8, "like": 20, "reply": 15, "post": 1},
     "limits_per_day": {"comment": 22, "like": 55, "reply": 40, "post": 1},

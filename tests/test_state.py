@@ -108,3 +108,21 @@ def test_session_crossing_midnight_keeps_its_count():
     u = usage(cfg, rows, {"started": started.isoformat()}, datetime(2026, 10, 31, 0, 10))
     assert u.session["comment"] == 2
     assert not u.allows("comment")
+
+
+def test_cooldown_limits_comments_only():
+    cfg = parse_config({})
+    rows = [{"ts": "2026-10-30T09:00:00", "action": "comment", "url": "u1", "author": "Jan"}]
+    assert check_target(cfg, rows, "u2", "Jan", NOW) == (False, "author cooldown")
+    assert check_target(cfg, rows, "u2#jan", "Jan", NOW, action="reply") == (True, "OK")
+    assert check_target(cfg, rows, "u2", "Jan", NOW, action="like") == (True, "OK")
+
+
+def test_like_and_comment_on_one_post_do_not_block_each_other():
+    cfg = parse_config({})
+    rows = [{"ts": "2026-10-30T09:00:00", "action": "like", "url": "u1", "author": "Jan"}]
+    assert check_target(cfg, rows, "u1", "Jan", NOW) == (True, "OK")
+    assert check_target(cfg, rows, "u1", "Jan", NOW, action="like") == (False, "already engaged")
+    rows = [{"ts": "2026-10-30T09:00:00", "action": "comment", "url": "u1", "author": "Jan"}]
+    assert check_target(cfg, rows, "u1", "Jan", NOW, action="like") == (True, "OK")
+    assert check_target(cfg, rows, "u1", "Jan", NOW, action="reply") == (False, "already engaged")

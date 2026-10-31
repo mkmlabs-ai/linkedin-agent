@@ -135,16 +135,23 @@ def usage(cfg: Config, rows: list[dict[str, Any]], session: dict[str, Any], now:
 
 
 def check_target(
-    cfg: Config, rows: list[dict[str, Any]], url: str, author: str | None, now: datetime | None = None
+    cfg: Config,
+    rows: list[dict[str, Any]],
+    url: str,
+    author: str | None,
+    now: datetime | None = None,
+    action: str = "comment",
 ) -> tuple[bool, str]:
-    """Return (ok, reason). A target is refused when we already engaged with
-    that URL, or commented on the same author within the cooldown window."""
+    """Return (ok, reason). A target is refused when we already did this kind
+    of thing on that URL. The author cooldown limits new comments only: it must
+    not stop a reply to someone who answered the owner, or a reaction."""
     live = [r for r in rows if not r.get("dry")]
     key = normalize_url(url)
-    if any(r["action"] in ENGAGEMENTS and normalize_url(r.get("url") or "") == key for r in live):
+    same_kind = ("like",) if action == "like" else ENGAGEMENTS
+    if any(r["action"] in same_kind and normalize_url(r.get("url") or "") == key for r in live):
         return False, "already engaged"
     name = normalize_author(author)
-    if name:
+    if name and action == "comment":
         cut = now_iso((now or datetime.now()) - timedelta(days=cfg.author_cooldown_days))
         if any(
             r["action"] == "comment" and normalize_author(r.get("author")) == name and str(r["ts"]) >= cut for r in live
