@@ -54,8 +54,23 @@ def build_prompt(slot: str, report_path: Path, paths: Paths) -> str:
 
 def claude_command(cfg: Config, prompt: str) -> list[str]:
     r = cfg.runner
+    resolved = find_cli(r.claude_bin) or r.claude_bin
+    if os.path.basename(resolved) == "agy":
+        # Note: in `agy`, `--model` and `--effort` must precede `-p <prompt>`.
+        return [
+            resolved,
+            "--model",
+            r.model,
+            "--effort",
+            r.effort,
+            "--dangerously-skip-permissions",
+            "--output-format",
+            "text",
+            "-p",
+            prompt,
+        ]
     return [
-        find_cli(r.claude_bin) or r.claude_bin,
+        resolved,
         "-p",
         prompt,
         "--agent",
@@ -203,7 +218,13 @@ class SessionRunner:
         self._log(log, f"=== end exit={rc}")
 
         # A report from an earlier run of the same slot does not count.
-        if not report.exists() or report.stat().st_mtime < begin or not report.read_text(encoding="utf-8").strip():
+        # Allow 2s tolerance for filesystem timestamp resolution
+        stale_or_empty = (
+            not report.exists()
+            or report.stat().st_mtime < (begin - 2.0)
+            or not report.read_text(encoding="utf-8").strip()
+        )
+        if stale_or_empty:
             report.write_text(fallback_text(slot, rc, _tail(logfile), self.cfg.language), encoding="utf-8")
 
         rows = [r for r in Store(self.paths).entries() if str(r["ts"]) >= since]

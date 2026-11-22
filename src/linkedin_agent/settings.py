@@ -42,10 +42,10 @@ DEFAULTS: dict[str, Any] = {
     "min_post_reactions_to_comment": 0,
     "max_post_age_hours": 168,
     "runner": {
-        "claude_bin": "claude",
+        "claude_bin": "agy",
         "agent": "linkedin-operator",
-        "model": "claude-sonnet-5-5",
-        "effort": "high",
+        "model": "gemini-4-neon-medium",
+        "effort": "medium",
         "timeout_minutes": 90,
         "jitter_minutes": 35,
         "browser_app": "/Applications/ego lite.app",

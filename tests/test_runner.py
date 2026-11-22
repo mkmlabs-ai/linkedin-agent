@@ -36,7 +36,7 @@ class FakeRun:
         self.calls.append(cmd)
         if cmd[0] == "pgrep":
             return subprocess.CompletedProcess(cmd, 0)
-        if cmd[0] == "claude" and self.claude:
+        if cmd[0] in ("agy", "claude") and self.claude:
             return self.claude(cmd, **kw)
         return subprocess.CompletedProcess(cmd, 0)
 
@@ -92,7 +92,8 @@ def test_agent_report_is_used_and_html_lists_this_runs_actions(paths):
     store.append(make_row(cfg, {}, "comment", "https://old", text="old", now=datetime(2026, 10, 29, 9)))
 
     def claude(cmd, **kw):
-        report = paths.root / cmd[2].split("report to ")[1].rstrip(".")
+        prompt = cmd[cmd.index("-p") + 1]
+        report = paths.root / prompt.split("report to ")[1].rstrip(".")
         report.write_text("Slot morning | mode dry_run\nSkipped: nothing fresh\n")
         store.append(make_row(cfg, {}, "comment", "https://new", author="Ann", text="new", now=NOW))
         return subprocess.CompletedProcess(cmd, 0)
@@ -142,11 +143,22 @@ def test_notify_command_gets_placeholders(paths, write_config):
 def test_no_notify_command_means_no_extra_process(paths):
     fake = FakeRun(paths)
     runner(paths, fake)("morning", now=True)
-    assert set(fake.names()) <= {"pgrep", "open", "claude"}
+    assert set(fake.names()) <= {"pgrep", "open", "agy"}
 
 
 def test_claude_command_shape(paths, monkeypatch):
     monkeypatch.setattr("linkedin_agent.runner.find_cli", lambda name: None)
+    cmd = claude_command(load_config(paths), "do it")
+    assert cmd[0] == "agy"
+    assert cmd[cmd.index("--model") + 1] == "gemini-4-neon-medium"
+    assert cmd[cmd.index("--effort") + 1] == "medium"
+    assert cmd.index("--model") < cmd.index("-p")
+    assert cmd[cmd.index("-p") + 1] == "do it"
+
+
+def test_legacy_claude_command_shape(paths, write_config, monkeypatch):
+    monkeypatch.setattr("linkedin_agent.runner.find_cli", lambda name: None)
+    write_config(runner={"claude_bin": "claude", "model": "claude-sonnet-5-5", "effort": "high"})
     cmd = claude_command(load_config(paths), "do it")
     assert cmd[:3] == ["claude", "-p", "do it"]
     assert cmd[cmd.index("--agent") + 1] == "linkedin-operator"
@@ -180,7 +192,7 @@ def test_browser_never_started_off_macos(paths, monkeypatch):
     monkeypatch.setattr("linkedin_agent.runner.sys.platform", "linux")
     fake = FakeRun(paths)
     runner(paths, fake)("morning", now=True)
-    assert fake.names() == ["claude"]
+    assert fake.names() == ["agy"]
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
@@ -213,7 +225,7 @@ def test_grandchild_ignoring_sigterm_is_killed(tmp_path):
 
 def test_claude_resolved_to_absolute_path(paths, monkeypatch):  # overrides the autouse stub
     monkeypatch.setattr("linkedin_agent.runner.find_cli", lambda name: f"/home/u/.local/bin/{name}")
-    assert claude_command(load_config(paths), "x")[0] == "/home/u/.local/bin/claude"
+    assert claude_command(load_config(paths), "x")[0] == "/home/u/.local/bin/agy"
 
 
 def test_agent_gets_extended_path(tmp_path, monkeypatch):

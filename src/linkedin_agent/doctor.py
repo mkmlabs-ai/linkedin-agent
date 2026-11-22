@@ -51,13 +51,13 @@ def run_checks(paths: Paths) -> list[Check]:
         ),
     ]
 
-    claude = find_cli("claude")
+    agy = find_cli("agy")
     checks.append(
         Check(
-            "claude",
-            bool(claude),
-            _version(claude) if claude else "not found",
-            "Install Claude Code: curl -fsSL https://claude.ai/install.sh | bash",
+            "agy",
+            bool(agy),
+            _version(agy) if agy else "not found",
+            "Install Antigravity CLI (`agy`) and ensure ~/.local/bin is on PATH.",
         )
     )
 
